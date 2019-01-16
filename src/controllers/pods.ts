@@ -39,7 +39,7 @@ export default function (server: Hapi.Server, deps: Injector) {
 
   function getPodUrl (manifestHash: string): string {
     const hostUrl = new URL(config.publicUri)
-    hostUrl.host = manifestHash + '.' + hostUrl.host
+    hostUrl.pathname = '/' + manifestHash
     return hostUrl.href
   }
 

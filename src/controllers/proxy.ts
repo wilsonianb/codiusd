@@ -1,12 +1,12 @@
 import * as Hapi from 'hapi'
 import * as Boom from 'boom'
-import { ClientRequestArgs } from 'http'
+import { IncomingMessage } from 'http'
 import { Socket } from 'net'
 import { Injector } from 'reduct'
 import PodDatabase from '../services/PodDatabase'
 
 const HttpProxy = require('http-proxy')
-const MANIFEST_LABEL_REGEX = /^[a-zA-Z2-7]{52}$/
+const MANIFEST_LABEL_REGEX = /^[a-zA-Z2-7]{52}(\/|\?|$)/
 
 import { create as createLogger } from '../common/log'
 const log = createLogger('proxy')
@@ -17,12 +17,12 @@ export default function (server: Hapi.Server, deps: Injector) {
     ws: true // allow websockets
   })
 
-  function isPodRequest (host: string): boolean {
-    return !!MANIFEST_LABEL_REGEX.exec(host.split('.')[0])
+  function isPodRequest (path: string): boolean {
+    return !!MANIFEST_LABEL_REGEX.exec(path.split('/')[1])
   }
 
-  function getPod (host: string): string {
-    const [ label ] = host.split('.')
+  function getPod (path: string): string {
+    const label = path.split('/')[1].slice(0, 52)
     const pod = pods.getPod(label)
 
     if (!pod || !pod.ip || !pod.port) {
@@ -34,14 +34,17 @@ export default function (server: Hapi.Server, deps: Injector) {
   }
 
   async function proxyToPod (request: Hapi.Request, h: any) {
-    const host = request.info.host
+    const path = request.path
 
-    if (!isPodRequest(host)) {
+    if (!isPodRequest(path)) {
       return h.continue
     }
 
-    const target = getPod(host)
+    const target = getPod(path)
     await new Promise((resolve, reject) => {
+      if (request.raw.req.url) {
+        request.raw.req.url = request.raw.req.url.slice(53)
+      }
       proxy.web(request.raw.req, request.raw.res, { target }, (e: any) => {
         const statusError = {
           ECONNREFUSED: Boom.serverUnavailable(),
@@ -62,22 +65,21 @@ export default function (server: Hapi.Server, deps: Injector) {
     socket.end()
   }
 
-  async function wsProxyToPod (req: ClientRequestArgs, socket: Socket, head: Buffer) {
-    const host = String((req.headers || {}).host)
-
+  async function wsProxyToPod (req: IncomingMessage, socket: Socket, head: Buffer) {
     socket.on('error', (e: Error) => {
       if (e.message !== 'read ECONNRESET') {
         log.debug(`socket error. msg=${e.message}`)
       }
     })
 
-    if (!isPodRequest(host)) {
+    if (!req.url || !isPodRequest(req.url)) {
       writeError(socket, 502, 'Bad Gateway')
       return
     }
 
     try {
-      const target = getPod(host)
+      const target = getPod(req.url)
+      req.url = req.url.slice(53)
       proxy.ws(req, socket, head, { target }, (error: Error) => {
         if (error.message !== 'socket hang up') {
           log.debug(`error in ws proxy. error="${error.message}"`)

@@ -113,7 +113,7 @@ export default class SelfTest {
         const serverPromise = () => {
           return new Promise(async (resolve, reject) => {
             try {
-              const serverRes = await axios.get(`https://${response.manifestHash}.${url.host}`)
+              const serverRes = await axios.get(`https://${url.host}/${response.manifestHash}`)
               const serverCheck = serverRes.data
               log.debug('Pod HTTP request succeeded', serverCheck)
               if (serverCheck.imageUploaded) {
@@ -162,7 +162,7 @@ export default class SelfTest {
 
         const webSocketPromise = () => {
           return new Promise((resolve, reject) => {
-            const ws = new WebSocket(`wss://${response.manifestHash}.${url.host}`)
+            const ws = new WebSocket(`wss://${url.host}/${response.manifestHash}`)
             ws.on('open', () => {
               log.debug('Web sockets Pod received request')
             })
