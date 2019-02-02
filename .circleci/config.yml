@@ -51,6 +51,45 @@ jobs:
 
       - run: npm test
 
+  build-publish-image:
+    docker:
+      - image: docker:18.09.1-git
+    steps:
+      - checkout
+      - setup_remote_docker
+
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update nodejs nodejs-npm
+
+      - restore_cache:
+          keys:
+            - v1-{{ .Branch }}
+          paths:
+            - /caches/codiusd.tar
+
+      - run:
+          name: Build Docker image
+          command: |
+            docker build \
+              -t codiusd \
+              .
+      - save_cache:
+          key: v1-{{ .Branch }}-{{ epoch }}
+          paths:
+            - /caches/codiusd.tar
+
+      - deploy:
+          name: Push Docker image
+          command: |
+            CODIUSD_VERSION=$(npx -c 'echo "$npm_package_version"')
+            if [ "$(npm show codiusd version)" != "${CODIUSD_VERSION}" ]; then
+              docker login -u $DOCKER_USER -p $DOCKER_PASS
+              docker tag codiusd "${DOCKER_REPO}/codiusd:${CODIUSD_VERSION}"
+              docker push "${DOCKER_REPO}/codiusd:${CODIUSD_VERSION}"
+            fi
+
   publish_to_npm:
     docker:
       - image: circleci/node:10
@@ -74,7 +113,7 @@ jobs:
 
       - run:
           name: Publish to NPM (only if a new version has been tagged)
-          command: if [ "$(npm show codiusd version)" != "$(npm ls --depth=-1 2>/dev/null | head -1 | cut -f 1 -d " " | cut -f 2 -d @)" ] ; then npm publish ; fi
+          command: if [ "$(npm show codiusd version)" != "$(npx -c 'echo "$npm_package_version"')" ] ; then npm publish ; fi
 
 workflows:
   version: 2
@@ -82,6 +121,9 @@ workflows:
     jobs:
       - build_node_v10
       - build_node_v8
+      - build-publish-image:
+          requires:
+            - build_node_v10
       - publish_to_npm:
           requires:
             - build_node_v10
