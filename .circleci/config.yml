@@ -84,7 +84,7 @@ jobs:
           name: Push Docker image
           command: |
             CODIUSD_VERSION=$(npx -c 'echo "$npm_package_version"')
-            if [ "$(npm show codiusd version)" != "${CODIUSD_VERSION}" ]; then
+            if [ "$(npm show codiusd version)" == "${CODIUSD_VERSION}" ]; then
               docker login -u $DOCKER_USER -p $DOCKER_PASS
               docker tag codiusd "${DOCKER_REPO}/codiusd:${CODIUSD_VERSION}"
               docker push "${DOCKER_REPO}/codiusd:${CODIUSD_VERSION}"
