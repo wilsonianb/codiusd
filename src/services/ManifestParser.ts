@@ -1,4 +1,5 @@
 import { PodSpec } from '../schemas/PodSpec'
+import { ContainerSpec } from '../schemas/ContainerSpec'
 import { Injector } from 'reduct'
 import Config from './Config'
 import ManifestHash from './ManifestHash'
@@ -13,7 +14,7 @@ export interface ManifestOptions {
 }
 
 export interface Env {
-  env: string,
+  name: string,
   value: string
 }
 
@@ -24,8 +25,8 @@ export class Manifest {
   private privateManifest: object
   private readonly MACHINE_SPECS = {
     small: {
-      vcpu: 1,
-      memory: 512
+      cpu: '1000m',
+      memory: '512Mi'
     }
   }
 
@@ -38,10 +39,19 @@ export class Manifest {
 
   toPodSpec (): PodSpec {
     return {
-      id: this.hash,
-      resource: this.machineToResource(this.manifest['machine']),
-      containers: this.manifest['containers']
-        .map(this.processContainer.bind(this))
+      apiVersion: 'v1',
+      kind: 'Pod',
+      metadata: {
+        name: this.hash,
+        namespace: this.config.k8sNamespace
+      },
+      spec: {
+        runtimeClassName: 'kata-qemu',
+        automountServiceAccountToken: false,
+        dnsPolicy: 'Default',
+        containers: this.manifest['containers']
+          .map(this.processContainer.bind(this))
+      }
     }
   }
 
@@ -49,30 +59,36 @@ export class Manifest {
     return this.MACHINE_SPECS[machine] || this.MACHINE_SPECS['small']
   }
 
-  processContainer (container: object) {
+  processContainer (container: object): ContainerSpec {
     return {
-      name: `${this.hash}__${container['id']}`,
+      name: `${container['id']}`,
       image: container['image'],
       command: container['command'],
-      workdir: container['workdir'],
-      envs: this.processEnv(container['environment'])
+      workingDir: container['workdir'],
+      resources: {
+        limits: this.machineToResource(this.manifest['machine'])
+      },
+      env: this.processEnv(container['environment']),
+      ports: this.manifest['port'] ? [{
+        containerPort: Number(this.manifest['port'])
+      }] : undefined
     }
   }
 
   processEnv (environment: object): Array<Env> {
     const hostEnv = [{
-      env: 'CODIUS',
+      name: 'CODIUS',
       value: 'true'
     }, {
-      env: 'CODIUS_HOST',
+      name: 'CODIUS_HOST',
       // TODO: if this URI resolves to 127.0.0.1 it won't be accesible to
       // the contract from inside of hyper
       value: this.config.publicUri
     }, {
-      env: 'CODIUS_MANIFEST_HASH',
+      name: 'CODIUS_MANIFEST_HASH',
       value: this.hash
     }, {
-      env: 'CODIUS_MANIFEST',
+      name: 'CODIUS_MANIFEST',
       value: JSON.stringify(this.manifest)
     }]
 
@@ -86,7 +102,7 @@ export class Manifest {
       }
 
       return {
-        env: key,
+        name: key,
         value: this.processValue(environment[key])
       }
     })

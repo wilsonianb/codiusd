@@ -45,7 +45,7 @@ export default function (server: Hapi.Server, deps: Injector) {
 
   function checkIfHostFull (podSpec: PodSpec) {
     const totalMem = os.totalmem()
-    const totalPodMem = checkMemory(podSpec.resource)
+    const totalPodMem = checkMemory(podSpec)
     if ((podManager.getMemoryUsed() + totalPodMem) * (2 ** 20) / totalMem > config.maxMemoryFraction) {
       return true
     }
@@ -103,14 +103,14 @@ export default function (server: Hapi.Server, deps: Injector) {
     await podManager.startPod(podSpec, duration,
       request.payload['manifest']['port'])
 
-    await manifestDatabase.saveManifest(podSpec.id, request.payload['manifest'])
+    await manifestDatabase.saveManifest(podSpec.metadata.name, request.payload['manifest'])
 
     // return info about running pod to uploader
-    const podInfo = podDatabase.getPod(podSpec.id)
+    const podInfo = podDatabase.getPod(podSpec.metadata.name)
 
     if (!podInfo) {
       throw Boom.serverUnavailable('pod has stopped. ' +
-        `manifestHash=${podSpec.id}`)
+        `manifestHash=${podSpec.metadata.name}`)
     }
 
     return {
@@ -180,7 +180,7 @@ export default function (server: Hapi.Server, deps: Injector) {
     log.debug('podSpec', podSpec)
 
     return {
-      manifestHash: podSpec.id,
+      manifestHash: podSpec.metadata.name,
       price: price.toString()
     }
   }

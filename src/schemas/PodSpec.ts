@@ -5,19 +5,34 @@
  */
 
 export interface PodSpec {
-  id: string;
-  resource?: {
-    vcpu?: number;
-    memory?: number;
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace: string;
   };
-  containers: {
-    name?: string;
-    image: string;
-    command?: string[];
-    workdir?: string;
-    environment?: {
-      env?: string;
-      value?: string;
+  spec: {
+    automountServiceAccountToken: boolean;
+    containers: {
+      name?: string;
+      image: string;
+      command?: string[];
+      workingDir?: string;
+      resources: {
+        limits: {
+          memory: string;
+          cpu: string;
+        };
+      };
+      ports?: {
+        containerPort?: number;
+      }[];
+      env?: {
+        name?: string;
+        value?: string;
+      }[];
     }[];
-  }[];
+    dnsPolicy: string;
+    runtimeClassName: string;
+  };
 }

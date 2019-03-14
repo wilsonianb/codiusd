@@ -148,7 +148,7 @@ export default class SelfTest {
             this.httpSuccess = true
             log.info('Codius Host Self Test successfully uploaded pod')
           } catch (err) {
-            log.error('Error occurred while uploading self-test pod err=', err)
+            log.error('Error occurred while testing HTTP err=', err)
             await new Promise(resolve => {
               setTimeout(() => {
                 resolve()
@@ -208,7 +208,7 @@ export default class SelfTest {
         this.selfTestSuccess = this.wsSuccess && this.uploadSuccess && this.httpSuccess
         this.running = false
         if (this.selfTestSuccess) {
-          log.info('Self test successful:', this.selfTestSuccess, ' Upload succcess=', this.uploadSuccess, ' HTTP success=', this.httpSuccess, ' WebSocket success=', this.wsSuccess)
+          log.info('Self test successful:', this.selfTestSuccess, ' Upload success=', this.uploadSuccess, ' HTTP success=', this.httpSuccess, ' WebSocket success=', this.wsSuccess)
         } else {
           log.error('Self test failed: Upload Status=', this.uploadSuccess, ' Http Connection=', this.httpSuccess, ' WebSocket Connection=', this.wsSuccess)
           throw new Error('One or more components of Self Test have failed.')

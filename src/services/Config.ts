@@ -26,8 +26,6 @@ function setPrice () {
 
 export default class Config {
   readonly bearerToken: string
-  readonly hyperSock: string
-  readonly noop: boolean
   readonly port: number
   readonly bindIp: string
   readonly publicUri: string
@@ -38,6 +36,7 @@ export default class Config {
   readonly devMode: boolean
   readonly devIldcp: IldcpInfo
   readonly showAdditionalHostInfo: boolean
+  readonly k8sNamespace: string
   hostCostPerMonth: number
   readonly adminApi: boolean
   readonly adminPort: number
@@ -62,8 +61,6 @@ export default class Config {
       throw new Error('Codiusd requires CODIUS_PUBLIC_URI to be set')
     }
 
-    this.hyperSock = env.CODIUS_HYPER_SOCKET || '/var/run/hyper.sock'
-    this.noop = env.CODIUS_HYPER_NOOP === 'true'
     this.bindIp = env.CODIUS_BIND_IP || '127.0.0.1'
     this.codiusRoot = env.CODIUS_ROOT || '/var/lib/codius'
     this.memdownPersist = env.CODIUS_MEMDOWN_PERSIST === 'true'
@@ -80,12 +77,12 @@ export default class Config {
     this.hostCostPerMonth = setPrice()
     this.selfTestSuccess = false
     this.selfTestConfig = {
-      retryCount: Number(env.CODIUS_SELF_TEST_RETRIES) || 5,
-      retryInterval: Number(env.CODIUS_SELF_TEST_INTERVAL) * 1000 || 5000
+      retryCount: Number(env.CODIUS_SELF_TEST_RETRIES) || 6,
+      retryInterval: Number(env.CODIUS_SELF_TEST_INTERVAL) * 1000 || 10000
     }
+    this.k8sNamespace = env.CODIUS_K8S_NAMESPACE || 'default'
     // Admin API Config
     this.adminApi = env.CODIUS_ADMIN_API === 'true'
     this.adminPort = Number(env.CODIUS_ADMIN_PORT) || 3001
-
   }
 }

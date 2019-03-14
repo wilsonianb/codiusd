@@ -66,6 +66,7 @@
     "ilp-price": "^1.0.1",
     "ilp-protocol-ildcp": "^1.0.0",
     "inert": "^5.1.0",
+    "kubernetes-client": "^8.2.0",
     "leveldown": "^4.0.1",
     "levelup": "^3.0.1",
     "lodash": "^4.17.11",

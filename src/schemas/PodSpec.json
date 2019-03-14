@@ -1,30 +1,51 @@
 {
   "type": "object",
   "properties": {
-    "id": {
+    "apiVersion": {
       "type": "string",
       "required": true
     },
-    "resource": {
+    "kind": {
+      "type": "string",
+      "required": true
+    },
+    "metadata": {
       "type": "object",
       "properties": {
-        "vcpu": {
-          "type": "integer"
+        "name": {
+          "type": "string"
         },
-        "memory": {
-          "type": "integer"
+        "namespace": {
+          "type": "string"
         }
       },
+      "required": [ "name", "namespace" ],
       "additionalProperties": false
     },
-    "containers": {
-      "type": "array",
-      "items": {
-        "$ref": "./ContainerSpec.json"
+    "spec": {
+      "type": "object",
+      "properties": {
+        "automountServiceAccountToken": {
+          "type": "boolean"
+        },
+        "containers": {
+          "type": "array",
+          "items": {
+            "$ref": "./ContainerSpec.json"
+          },
+          "minItems": 1
+        },
+        "dnsPolicy": {
+          "type": "string"
+        },
+        "runtimeClassName": {
+          "type": "string"
+        }
       },
-      "minItems": 1
+      "required": [ "automountServiceAccountToken", "containers", "dnsPolicy", "runtimeClassName" ],
+      "additionalProperties": false
     }
   },
-  "required": [ "id", "containers" ],
+  "required": [ "apiVersion", "kind", "metadata", "spec" ],
   "additionalProperties": false
 }

@@ -14,16 +14,51 @@
         "type": "string"
       }
     },
-    "workdir": {
+    "workingDir": {
       "type": "string"
     },
-    "environment": {
+    "resources": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "memory": {
+              "type": "string"
+            },
+            "cpu": {
+              "type": "string"
+            }
+          },
+          "required": [ "memory", "cpu" ],
+          "additionalProperties": false
+        }
+      },
+      "required": [ "limits" ],
+      "additionalProperties": false
+    },
+    "ports": {
+      "type": "array",
+      "optional": true,
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "containerPort": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "env": {
       "type": "array",
       "optional": true,
       "items": {
         "type": "object",
         "properties": {
-          "env": {
+          "name": {
             "type": "string"
           },
           "value": {
@@ -34,6 +69,6 @@
       }
     }
   },
-  "required": ["image"],
+  "required": [ "image", "resources" ],
   "additionalProperties": false
 }

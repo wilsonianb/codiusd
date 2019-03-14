@@ -70,16 +70,6 @@ sudo npm install -g codiusd
 * Description: A monthly rate the host charges (in XRP) to host a program. `Codiusd` calculates this value down to the rate per second, as uploads are given a time in seconds to be hosted for.
 * Default: 10
 
-#### CODIUS_HYPER_SOCKET
-* Type: String
-* Description: The absolute path to the `hyperd` socket.
-* Default: `/var/run/hyper.sock`
-
-#### CODIUS_HYPER_NOOP
-* Type: Boolean
-* Description: Noops all `hyperd` API calls.
-* Default: false
-
 #### CODIUS_PORT
 * Type: [Number](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number)
 * Description: The port that codiusd will listen on.
@@ -104,6 +94,11 @@ sudo npm install -g codiusd
 * Type: JSON Array
 * Description: List of peers whose values are the URIs that resolve to their Codius instance.
 * Default: [ ]
+
+#### CODIUS_K8S_NAMESPACE
+* Type: String
+* Description: Kubernetes namespace in which to deploy pods
+* Default: 'default'
 
 ### API Documentation
 #### `POST /pods?duration=TIME_TO_LIVE`
@@ -181,7 +176,6 @@ Queries other Codius hosts for the peers known to each of them.
 * [x] Figure out encoding to hash manifest
 * [ ] How to escape the variable interpolation in manifest parser
 * [x] How to fill in the values for private sha256 variables
-* [x] Switch hyperctl to hyper.sock http requests
 * [ ] Check whether hyper instance is still running before adding duration
 * [ ] How do pods spend money?
 * [ ] add port field
@@ -192,19 +186,6 @@ Queries other Codius hosts for the peers known to each of them.
 * [ ] publish @sharafian/cog and pull from actual npm
 * [ ] proxy endpoints based on manifest hash to the contract's IP
 * [x] persist peers between sessions
-
-###### hyperd doesn't start containers on restart
-
-See:
-
-  * <https://github.com/hyperhq/hyperd/issues/654>
-  * <https://github.com/hyperhq/hyperd/issues/715>
-
-The hyperd logs will have errors like:
-
-    E0605 ...   persist.go:100] Pod[...] failed to load inf info of : leveldb: not found
-
-As a temporary workaround, offending containers can be removed from `/var/lib/hyper/containers/`, which will allow them to be started again fresh.
 
 ## License
 

@@ -2,7 +2,7 @@
 import * as Boom from 'boom'
 import { Injector } from 'reduct'
 import { PodSpec } from '../schemas/PodSpec'
-import HyperClient from './HyperClient'
+import KubernetesClient from './KubernetesClient'
 import PodDatabase from './PodDatabase'
 import ManifestDatabase from './ManifestDatabase'
 import { checkMemory } from '../util/podResourceCheck'
@@ -14,16 +14,14 @@ const log = createLogger('PodManager')
 const DEFAULT_INTERVAL = 5000
 
 export default class PodManager {
-  private hyper: HyperClient
   private pods: PodDatabase
   private manifests: ManifestDatabase
-  private hyperClient: HyperClient
+  private kubernetesClient: KubernetesClient
 
   constructor (deps: Injector) {
     this.pods = deps(PodDatabase)
     this.manifests = deps(ManifestDatabase)
-    this.hyper = deps(HyperClient)
-    this.hyperClient = deps(HyperClient)
+    this.kubernetesClient = deps(KubernetesClient)
   }
 
   public checkPodMem (memory: number | void): number {
@@ -49,7 +47,7 @@ export default class PodManager {
     await Promise.all(expired.map(async pod => {
       log.debug('cleaning up pod. id=' + pod)
       try {
-        await this.hyperClient.deletePod(pod)
+        await this.kubernetesClient.deletePod(pod)
         await this.manifests.deleteManifest(pod)
       } catch (e) {
         log.error('error cleaning up pod. ' +
@@ -76,32 +74,32 @@ export default class PodManager {
   }
 
   async startPod (podSpec: PodSpec, duration: string, port?: string) {
-    if (this.pods.getPod(podSpec.id)) {
-      const isRunning = await this.hyperClient.getPodInfo(podSpec.id)
-        .then(info => !!info)
+    if (this.pods.getPod(podSpec.metadata.name)) {
+      const isRunning = await this.kubernetesClient.getPodInfo(podSpec.metadata.name)
+        .then(info => !!info && info.status.phase === 'Running')
         .catch(() => false)
       if (isRunning) {
-        await this.pods.addDurationToPod(podSpec.id, duration)
+        await this.pods.addDurationToPod(podSpec.metadata.name, duration)
         return
       }
     }
 
     try {
       await this.pods.addPod({
-        id: podSpec.id,
+        id: podSpec.metadata.name,
         running: true,
         duration,
-        memory: checkMemory(podSpec.resource)
+        memory: checkMemory(podSpec)
       })
 
       // TODO: validate regex on port arg incoming
       if (port && Number(port) > 0) {
-        await this.pods.setPodPort(podSpec.id, port)
+        await this.pods.setPodPort(podSpec.metadata.name, port)
       }
-      await this.hyperClient.runPod(podSpec)
+      await this.kubernetesClient.runPod(podSpec)
 
-      const ip = await this.hyper.getPodIP(podSpec.id)
-      await this.pods.setPodIP(podSpec.id, ip)
+      const ip = await this.kubernetesClient.getPodIP(podSpec.metadata.name)
+      await this.pods.setPodIP(podSpec.metadata.name, ip)
 
     } catch (err) {
       log.error(`run pod failed, error=${err.message}`)
@@ -113,21 +111,14 @@ export default class PodManager {
   }
 
   async getLogStream (podId: string, follow: boolean = false) {
-    const { spec: { containers } } = await this.hyperClient.getPodInfo(podId)
-
-    const stdStreams = {
-      1: 'stdout',
-      2: 'stderr'
-    }
+    const { spec: { containers } } = await this.kubernetesClient.getPodInfo(podId)
 
     const streams = await Promise.all(containers.map(async container => {
-      const stream = await this.hyperClient.getLog(container.containerID, follow)
+      const stream = await this.kubernetesClient.getLog(podId, container.name, follow)
       const transform = new Transform({
         transform (chunk: Buffer, encoding: string, callback: Function) {
-          const streamName = stdStreams[chunk[0]] || chunk[0]
-          const containerName = container.name.substring(container.name.indexOf('_') + 1)
-          const logData = chunk.slice(8)
-          const logLine = `${containerName} ${streamName} ${logData.toString()}`
+          const containerName = container.name.substring(container.name.indexOf('_') + 1)  // why the substring?
+          const logLine = `${containerName} ${chunk.toString()}`
           callback(null, logLine)
         }
       })
@@ -149,7 +140,7 @@ export default class PodManager {
   private async verifyRunningPods () {
     const dbPods = this.pods.getRunningPods()
     log.debug(`dbPods=${dbPods}`)
-    const runningPodsSet = new Set(await this.hyperClient.getPodList())
+    const runningPodsSet = new Set(await this.kubernetesClient.getPodList())
     const podsToDelete = dbPods.filter(pod => !runningPodsSet.has(pod))
     log.debug(`delete pods=${podsToDelete}`)
     this.pods.deletePods(podsToDelete)
