@@ -41,6 +41,8 @@ export default class Config {
   readonly devIldcp: IldcpInfo
   readonly showAdditionalHostInfo: boolean
   hostCostPerMonth: number
+  readonly defaultDuration: string
+  readonly minDuration: string
   readonly adminApi: boolean
   readonly adminPort: number
   selfTestSuccess: boolean
@@ -82,6 +84,8 @@ export default class Config {
       assetScale: 3
     }
     this.hostCostPerMonth = setPrice()
+    this.defaultDuration = env.CODIUS_DEFAULT_DURATION || 'PT1H'
+    this.minDuration = env.CODIUS_MIN_DURATION || 'PT1M'
     this.selfTestSuccess = false
     this.selfTestConfig = {
       retryCount: Number(env.CODIUS_SELF_TEST_RETRIES) || 5,
@@ -90,6 +94,5 @@ export default class Config {
     // Admin API Config
     this.adminApi = env.CODIUS_ADMIN_API === 'true'
     this.adminPort = Number(env.CODIUS_ADMIN_PORT) || 3001
-
   }
 }

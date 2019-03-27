@@ -70,6 +70,16 @@ sudo npm install -g codiusd
 * Description: A monthly rate the host charges (in XRP) to host a program. `Codiusd` calculates this value down to the rate per second, as uploads are given a time in seconds to be hosted for.
 * Default: 10
 
+#### CODIUS_DEFAULT_DURATION
+* Type: String
+* Description: An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) for how long the host will run a workload if no duration is specified. This does not apply if the uploader is paying with pull payments, in which case the pod will run until recurring payments fails.
+* Default: `PT1H`
+
+#### CODIUS_MIN_DURATION
+* Type: String
+* Description: An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) for the shortest amount of time the host will deploy and run a workload. This is also used to determine how frequently the host should charge for a workload (if the user is paying via recurring pull payments).
+* Default: `PT1M`
+
 #### CODIUS_HYPER_SOCKET
 * Type: String
 * Description: The absolute path to the `hyperd` socket.

@@ -6,16 +6,16 @@ import BigNumber from 'bignumber.js'
 import { create as createLogger } from '../common/log'
 const log = createLogger('PodDatabase')
 
-function addDuration (duration: string, _date?: string): string {
+function addDuration (duration: number, _date?: string): string {
   const date = _date || new Date().toISOString()
-  return new Date(Number(new Date(date)) + Number(duration) * 1000)
+  return new Date(Number(new Date(date)) + duration * 1000)
     .toISOString()
 }
 
 export interface AddPodParams {
   id: string,
   running: boolean,
-  duration: string,
+  duration: number,
   memory: number
 }
 
@@ -58,7 +58,7 @@ export default class PodDatabase {
       .map(p => p.id)
   }
 
-  public async addDurationToPod (id: string, duration: string) {
+  public async addDurationToPod (id: string, duration: number) {
     const info = this.pods.get(id)
     if (!info) {
       throw Boom.notFound('no pod found with id. id=' + id)
@@ -104,7 +104,7 @@ export default class PodDatabase {
 
   public async addPod (params: AddPodParams) {
     const existing = this.pods.get(params.id)
-    const uptime = ((existing && existing.totalUptime) || 0) + Number(params.duration)
+    const uptime = ((existing && existing.totalUptime) || 0) + params.duration
 
     const info: PodInfo = {
       id: params.id,

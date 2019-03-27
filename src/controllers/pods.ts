@@ -13,7 +13,11 @@ import PodDatabase from '../services/PodDatabase'
 import ManifestDatabase from '../services/ManifestDatabase'
 import CodiusDB from '../util/CodiusDB'
 import ManifestParser from '../services/ManifestParser'
+import PullPaymentManager from '../services/PullPaymentManager'
+import * as SPSP from 'ilp-protocol-spsp'
+import { RecurringPull } from 'ilp-pull-manager'
 import os = require('os')
+import * as moment from 'moment'
 const Enjoi = require('enjoi')
 const PodRequest = require('../schemas/PodRequest.json')
 import BigNumber from 'bignumber.js'
@@ -27,15 +31,30 @@ export interface PostPodResponse {
   expiry: string
 }
 
+const payMethods = {
+  PULL: 'interledger-pull',
+  STREAM: 'interledger-stream'
+}
+
 export default function (server: Hapi.Server, deps: Injector) {
   const podManager = deps(PodManager)
   const podDatabase = deps(PodDatabase)
+  const pullPaymentManager = deps(PullPaymentManager)
   const manifestDatabase = deps(ManifestDatabase)
   const manifestParser = deps(ManifestParser)
   const config = deps(Config)
   const ildcp = deps(Ildcp)
   const codiusdb = deps(CodiusDB)
-  let profit: BigNumber | undefined
+
+  const minDuration = moment.duration(config.minDuration).asSeconds()
+  const defaultDuration = moment.duration(config.defaultDuration).asSeconds()
+
+  pullPaymentManager.on('pullPayment', async (manifestHash: string, pullPayment: RecurringPull, totalReceived: string) => {
+    await addProfit(totalReceived)
+    const duration = moment.duration(pullPayment.interval).asSeconds()
+    const adjustedDuration = new BigNumber(totalReceived).dividedBy(pullPayment.amount).times(duration)
+    await this.podDatabase.addDurationToPod(manifestHash, adjustedDuration.toString())
+  })
 
   function getPodUrl (manifestHash: string): string {
     const hostUrl = new URL(config.publicUri)
@@ -52,27 +71,49 @@ export default function (server: Hapi.Server, deps: Injector) {
     return false
   }
 
-  async function addProfit (amount: BigNumber.Value): Promise<void> {
-    if (profit === undefined) {
-      profit = await codiusdb.getProfit(ildcp.getAssetCode(), ildcp.getAssetScale())
-    }
-    profit = profit.plus(amount)
-    await codiusdb.setProfit(ildcp.getAssetCode(), ildcp.getAssetScale(), profit)
-  }
-
-  async function chargeForDuration (request: any): Promise<string> {
-    const duration = request.query['duration'] || '3600'
-
+  function getPrice (duration: number): BigNumber {
     const currencyPerSecond = getCurrencyPerSecond(config, ildcp)
-    const price = currencyPerSecond.times(new BigNumber(duration)).integerValue(BigNumber.ROUND_CEIL)
-    log.debug('got post pod request. duration=' + duration + ' price=' + price.toString())
-
-    await chargeForRequest(request, price)
-
-    return duration
+    return currencyPerSecond.times(duration).integerValue(BigNumber.ROUND_CEIL)
   }
 
-  async function chargeForRequest (request: any, price: BigNumber.Value): Promise<void> {
+  function addProfit (totalReceived: string): Promise<void> {
+    return codiusdb.addProfit(ildcp.getAssetCode(), ildcp.getAssetScale(), totalReceived)
+    .catch((err) => {
+      log.error('errors updating profit. error=' + err.message)
+    })
+  }
+
+  async function chargeForDuration (request: any, manifestHash: string): Promise<number> {
+    if (request.headers['pay-accept'] === undefined ||
+      request.headers['pay-accept'].indexOf(payMethods.STREAM) !== -1) {
+      const duration = request.query['duration'] ? Math.min(Number(request.query['duration']), minDuration) : defaultDuration
+      const price = getPrice(duration)
+      log.debug('got pod request. duration=' + duration + ' price=' + price.toString())
+      await streamForRequest(request, price)
+      return duration
+    } else if (request.headers['pay-accept'].indexOf(payMethods.PULL) !== -1) {
+      if (request.query['duration']) {
+        const duration = Math.min(Number(request.query['duration']), minDuration)
+        const price = getPrice(duration)
+        log.debug('got pod request. duration=' + duration + ' price=' + price.toString())
+        await pullForRequest(request, price)
+        return duration
+      } else {
+        const duration = minDuration
+        const price = getPrice(duration)
+        log.debug('got pod request. duration=' + duration + ' price=' + price.toString())
+        await pullRecurringlyForRequest(request, manifestHash, price)
+        // TODO: add grace period buffer
+        return duration
+      }
+    } else {
+      const error = Boom.paymentRequired()
+      error.output.headers['Pay'] = payMethods.STREAM
+      throw error
+    }
+  }
+
+  async function streamForRequest (request: any, price: BigNumber.Value): Promise<void> {
     try {
       if (!request.headers['pay-token']) {
         throw Boom.paymentRequired()
@@ -84,13 +125,12 @@ export default function (server: Hapi.Server, deps: Injector) {
         log.error('error receiving payment. error=' + e.message)
         throw Boom.paymentRequired('Failed to get payment before timeout')
       } finally {
-        addProfit(stream.totalReceived).catch((err) => {
-          log.error('error updating profit. error=' + err.message)
-        })
+        // TODO: Refund received amount
+        await addProfit(stream.totalReceived)
       }
     } catch (e) {
       if (!e.output.headers['Pay']) {
-        e.output.headers['Pay'] = 'interledger-stream'
+        e.output.headers['Pay'] = payMethods.STREAM
       } else {
         const payHeader = e.output.headers['Pay'].split(' ')
         if (payHeader.length === 3) {
@@ -102,6 +142,53 @@ export default function (server: Hapi.Server, deps: Injector) {
       e.output.headers['Interledger-Stream-Asset-Code'] = ildcp.getAssetCode()
       e.output.headers['Interledger-Stream-Asset-Scale'] = ildcp.getAssetScale().toString()
       throw e
+    }
+  }
+
+  async function pullForRequest (request: any, price: BigNumber): Promise<void> {
+    try {
+      if (!request.headers['pay-token']) {
+        throw new Error()
+      }
+      const { totalReceived } = await SPSP.pull({
+        pointer: request.headers['pay-token'],
+        amount: price.toNumber()
+      })
+      await addProfit(totalReceived)
+    } catch (e) {
+      if (e instanceof SPSP.PaymentError) {
+        await addProfit(e.totalReceived)
+      }
+      const error = Boom.paymentRequired()
+      error.output.headers['Pay'] = payMethods.PULL
+      error.output.headers['Interledger-Pull-Price'] = price.toString()
+      error.output.headers['Interledger-Pull-Asset-Code'] = ildcp.getAssetCode()
+      error.output.headers['Interledger-Pull-Asset-Scale'] = ildcp.getAssetScale().toString()
+      throw error
+    }
+  }
+
+  async function pullRecurringlyForRequest (request: any, manifestHash: string, price: BigNumber, interval: string = config.minDuration): Promise<void> {
+    try {
+      if (!request.headers['pay-token']) {
+        throw new Error()
+      }
+      // TODO: add automatic retry instructions
+      if (!await pullPaymentManager.startRecurringPull(manifestHash, {
+        pointer: request.headers['pay-token'],
+        amount: price.toNumber(),
+        interval
+      })) {
+        throw new Error()
+      }
+    } catch (e) {
+      const error = Boom.paymentRequired()
+      error.output.headers['Pay'] = payMethods.PULL
+      error.output.headers['Interledger-Pull-Price'] = price.toString()
+      error.output.headers['Interledger-Pull-Asset-Code'] = ildcp.getAssetCode()
+      error.output.headers['Interledger-Pull-Asset-Scale'] = ildcp.getAssetScale().toString()
+      error.output.headers['Interledger-Pull-Interval'] = interval
+      throw error
     }
   }
 
@@ -117,7 +204,7 @@ export default function (server: Hapi.Server, deps: Injector) {
       throw Boom.serverUnavailable('Memory usage exceeded. Send pod request later.')
     }
 
-    const duration = await chargeForDuration(request)
+    const duration = await chargeForDuration(request, podSpec.id)
 
     await podManager.startPod(podSpec, duration,
       request.payload['manifest']['port'])
@@ -140,12 +227,16 @@ export default function (server: Hapi.Server, deps: Injector) {
   }
 
   async function extendPod (request: any, h: Hapi.ResponseToolkit) {
-    const duration = await chargeForDuration(request)
-
     const manifestHash = request.query['manifestHash']
     if (!manifestHash) {
       throw Boom.badData('manifestHash must be specified')
     }
+
+    if (!request.query['duration']) {
+      throw Boom.badData('duration must be specified')
+    }
+
+    const duration = await chargeForDuration(request, manifestHash)
 
     await podDatabase.addDurationToPod(manifestHash, duration)
 

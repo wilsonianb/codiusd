@@ -5,6 +5,7 @@ import { PodSpec } from '../schemas/PodSpec'
 import Config from './Config'
 import HyperClient from './HyperClient'
 import PodDatabase from './PodDatabase'
+import PullPaymentManager from './PullPaymentManager'
 import ManifestDatabase from './ManifestDatabase'
 import { checkMemory } from '../util/podResourceCheck'
 import { Transform, PassThrough } from 'stream'
@@ -32,6 +33,7 @@ export default class PodManager {
   private manifests: ManifestDatabase
   private hyperClient: HyperClient
   private config: Config
+  private pullPaymentManager: PullPaymentManager
 
   constructor (deps: Injector) {
     this.pods = deps(PodDatabase)
@@ -39,6 +41,7 @@ export default class PodManager {
     this.hyper = deps(HyperClient)
     this.hyperClient = deps(HyperClient)
     this.config = deps(Config)
+    this.pullPaymentManager = deps(PullPaymentManager)
   }
 
   public checkPodMem (memory: number | void): number {
@@ -77,7 +80,7 @@ export default class PodManager {
           `id=${pod} ` +
           `error=${e.message}`)
       }
-
+      this.pullPaymentManager.stopRecurringPull(pod)
       await this.pods.deletePod(pod)
     }))
 
@@ -96,7 +99,7 @@ export default class PodManager {
     return memory
   }
 
-  async startPod (podSpec: PodSpec, duration: string, port?: string) {
+  async startPod (podSpec: PodSpec, duration: number, port?: string) {
     if (this.pods.getPod(podSpec.id)) {
       const isRunning = await this.hyperClient.getPodInfo(podSpec.id)
         .then(info => !!info)

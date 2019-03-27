@@ -129,6 +129,12 @@ export default class CodiusDB {
     return profits
   }
 
+  async addProfit (assetCode: string, assetScale: number, _profit: BigNumber.Value): Promise<void> {
+    const profit = await this.loadValue(profitKey(assetCode, assetScale), '0')
+    const newProfit = new BigNumber(profit).plus(_profit)
+    await this.saveValue(profitKey(assetCode, assetScale), newProfit.toString())
+  }
+
   async setProfit (assetCode: string, assetScale: number, _profit: BigNumber.Value): Promise<void> {
     const profit = new BigNumber(_profit)
     await this.saveValue(profitKey(assetCode, assetScale), profit.toString())
