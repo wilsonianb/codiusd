@@ -80,6 +80,11 @@ sudo npm install -g codiusd
 * Description: An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) for the shortest amount of time the host will deploy and run a workload. This is also used to determine how frequently the host should charge for a workload (if the user is paying via recurring pull payments).
 * Default: `PT1M`
 
+#### CODIUS_PAYMENT_TIMEOUT
+* Type: Integer
+* Description: The number of milliseconds the host will wait while attempting to receive a payment.
+* Default: 10000
+
 #### CODIUS_HYPER_SOCKET
 * Type: String
 * Description: The absolute path to the `hyperd` socket.

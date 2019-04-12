@@ -43,6 +43,7 @@ export default class Config {
   hostCostPerMonth: number
   readonly defaultDuration: string
   readonly minDuration: string
+  readonly paymentTimeout: number
   readonly adminApi: boolean
   readonly adminPort: number
   selfTestSuccess: boolean
@@ -86,6 +87,7 @@ export default class Config {
     this.hostCostPerMonth = setPrice()
     this.defaultDuration = env.CODIUS_DEFAULT_DURATION || 'PT1H'
     this.minDuration = env.CODIUS_MIN_DURATION || 'PT1M'
+    this.paymentTimeout = Number(env.CODIUS_PAYMENT_TIMEOUT) || 10000
     this.selfTestSuccess = false
     this.selfTestConfig = {
       retryCount: Number(env.CODIUS_SELF_TEST_RETRIES) || 5,

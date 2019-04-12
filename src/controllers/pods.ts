@@ -120,7 +120,9 @@ export default function (server: Hapi.Server, deps: Injector) {
       }
       const stream = request.ilpStream()
       try {
-        await stream.receiveTotal(price)
+        await stream.receiveTotal(price, {
+          timeout: config.paymentTimeout
+        })
       } catch (e) {
         log.error('error receiving payment. error=' + e.message)
         throw Boom.paymentRequired('Failed to get payment before timeout')
@@ -153,6 +155,8 @@ export default function (server: Hapi.Server, deps: Injector) {
       const { totalReceived } = await SPSP.pull({
         pointer: request.headers['pay-token'],
         amount: price.toNumber()
+      }, {
+        timeout: config.paymentTimeout
       })
       await addProfit(totalReceived)
     } catch (e) {
@@ -177,7 +181,8 @@ export default function (server: Hapi.Server, deps: Injector) {
       if (!await pullPaymentManager.startRecurringPull(manifestHash, {
         pointer: request.headers['pay-token'],
         amount: price.toNumber(),
-        interval
+        interval,
+        timeout: config.paymentTimeout
       })) {
         throw new Error()
       }
