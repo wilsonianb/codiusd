@@ -33,8 +33,9 @@ export default function (server: Server, deps: Injector) {
 
     const { manifestHash } = serviceSpec.metadata.annotations
     return {
-      // TODO https
-      url: `http://${manifestHash}.${request.info.host}`,
+      // TODO request.info.host is inconsistent when testing on different machines
+      //      Solution: set Host header in tests
+      url: `https://${manifestHash}.${request.info.host}`,
       manifestHash
     }
   }

@@ -67,8 +67,7 @@ export default function (server: Hapi.Server, deps: Injector) {
     }
 
     const state = {
-      // TODO: https
-      proxySrc: `http://proxy-${request.info.host}/${request.params.path}`
+      proxySrc: `${new URL(config.publicUri).protocol}//proxy-${request.info.host}/${request.params.path}`
     }
 
     return h.view('index', {
@@ -89,7 +88,6 @@ export default function (server: Hapi.Server, deps: Injector) {
 
     try {
       return h.proxy({
-        // TODO: https
         uri: `http://${host.split('.')[0]}.${config.k8sNamespace}.svc.cluster.local/${request.params.path}`,
         passThrough: true
       })
