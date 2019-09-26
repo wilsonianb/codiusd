@@ -2,7 +2,7 @@ import { Client1_13 } from 'kubernetes-client'
 const { KubeConfig } = require('kubernetes-client')
 const Request = require('kubernetes-client/backends/request')
 import { KnativeServiceSpec } from '../schemas/KnativeServiceSpec'
-import Boom from 'boom'
+import Boom from '@hapi/boom'
 import Config from './Config'
 import { Injector } from 'reduct'
 

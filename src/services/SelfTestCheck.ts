@@ -1,5 +1,5 @@
 import * as Hapi from '@hapi/hapi'
-import * as Boom from 'boom'
+import Boom from '@hapi/boom'
 import { create as createLogger } from '../common/log'
 import Config from '../services/Config'
 import SelfTest from '../services/SelfTest'

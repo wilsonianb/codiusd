@@ -4,7 +4,7 @@ import { Injector } from 'reduct'
 import Config from './Config'
 import ManifestHash from './ManifestHash'
 import { createHash } from 'crypto'
-import * as Boom from 'boom'
+import Boom from '@hapi/boom'
 const canonicalJson = require('canonical-json')
 
 export interface ManifestOptions {

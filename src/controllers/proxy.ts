@@ -1,5 +1,5 @@
 import * as Hapi from '@hapi/hapi'
-import * as Boom from 'boom'
+import Boom from '@hapi/boom'
 import * as React from 'react'
 import { renderToString } from 'react-dom/server'
 import { Injector } from 'reduct'
